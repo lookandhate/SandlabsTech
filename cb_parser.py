@@ -2,7 +2,21 @@ import aiohttp
 import asyncio
 from aiohttp import ClientSession
 
-from pprint import pprint
+from typing import Dict, Optional
+from dataclasses import dataclass
+
+
+@dataclass
+class Currency:
+    """
+    Class that represents currency
+    """
+
+    num_code: int
+    char_code: str
+    nominal: int
+    name: str
+    value: float
 
 
 class CentralBankAPI:
@@ -23,7 +37,7 @@ class CentralBankAPI:
         # URL to Central bank website
         self._base_url = 'https://www.cbr.ru/scripts'
 
-    async def __get_all_currencies_rates(self):
+    async def __get_all_currencies_rates(self) -> Dict:
         """
         Internal method that requests exchange rates of all currencies from Centralbank
         :return:
@@ -32,19 +46,30 @@ class CentralBankAPI:
             return {'http_code': request.status,
                     'content': await request.text()}
 
-    async def get_currency_info(self, currency):
-        import xml
+    async def get_currency_info(self, currency_char_code) -> Optional[Currency]:
+        import xml.etree.ElementTree as ET
 
-        all_currencies_info = self.__get_all_currencies_rates()
+        all_currencies_info = await self.__get_all_currencies_rates()
 
+        # Check if API request was successful
         if all_currencies_info['http_code'] != 200:
             # Todo replace or remove base exception raising
             raise Exception
 
-async def test():
-    CB = CentralBankAPI()
-    data = await CB.get_currency_rates()
-    pprint(data)
+        document_root = ET.fromstring(all_currencies_info['content'])
 
+        # Iterate through root children
+        for currency in document_root:
+            # Check currency CharCode
+            # if it is currency that we are looking for than return Currency object
+            if currency.find('CharCode').text.lower() == currency_char_code.lower():
+                return Currency(num_code=int(currency.find('NumCode').text),
+                                char_code=currency_char_code,
+                                nominal=int(currency.find('Nominal').text),
+                                name=currency.find('Name').text,
 
-asyncio.new_event_loop().run_until_complete(test())
+                                # Replacing comma with dot so it could be converted to the float
+                                value=float(currency.find('Value').text.replace(',', '.', 1)),
+                                )
+
+        return None
