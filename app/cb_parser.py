@@ -42,7 +42,7 @@ class CentralBankAPI:
         Internal method that requests exchange rates of all currencies from Centralbank
         :return:
         """
-        async with self.session.get(f'{self._base_url}/XML_daily.asp') as request:
+        async with await self.session.get(f'{self._base_url}/XML_daily.asp') as request:
             return {'http_code': request.status,
                     'content': await request.text()}
 
