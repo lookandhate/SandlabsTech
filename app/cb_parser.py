@@ -39,14 +39,27 @@ class CentralBankAPI:
 
     async def __get_all_currencies_rates(self) -> Dict:
         """
-        Internal method that requests exchange rates of all currencies from Centralbank
+        Internal method that requests exchange rates of all currencies from Central bank
         :return:
         """
+
         async with await self.session.get(f'{self._base_url}/XML_daily.asp') as request:
             return {'http_code': request.status,
                     'content': await request.text()}
 
-    async def get_currency_info(self, currency_char_code) -> Optional[Currency]:
+    async def get_currency_info(self, currency_char_code: str) -> Optional[Currency]:
+        """
+        Retrieves and returns information about currency
+        :param currency_char_code: Currency code in ISO 4217 format
+        :return:
+        """
+
+        # Special case.
+        # Return Hard-coded info, because API does not provide info about RUB itself
+
+        if currency_char_code.lower() == 'rub':
+            return Currency(000, 'RUB', 1, 'Russian ruble', 1)
+
         import xml.etree.ElementTree as ET
 
         all_currencies_info = await self.__get_all_currencies_rates()
@@ -73,3 +86,21 @@ class CentralBankAPI:
                                 )
 
         return None
+
+    async def convert_currencies(self, from_currency: str, to_currency: str)  -> float:
+        """
+        Finds proportion between two currrencies using it's ratio to RUB
+        :param from_currency: Currency to convert from
+        :param to_currency: Currency to convert to
+        :return: currency 1 / currency 2
+        """
+
+        from_currency_info = await self.get_currency_info(from_currency)
+        to_currency_info = await self.get_currency_info(to_currency)
+
+        from_rubble_ratio = from_currency_info.value / from_currency_info.nominal
+        to_rubble_ration = to_currency_info.value / to_currency_info.nominal
+
+        proportion = from_rubble_ratio / to_rubble_ration
+
+        return proportion
