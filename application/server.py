@@ -3,7 +3,7 @@ import aiohttp
 from sanic import Sanic
 from sanic.response import json
 
-from app.cb_parser import CentralBankAPI
+from cb_parser import CentralBankAPI
 
 app = Sanic('app')
 currency_api_client: CentralBankAPI = None
