@@ -1,23 +1,57 @@
 import aiohttp
+import asyncio
+import sqlite3
 
 from sanic import Sanic
 from sanic.response import json
+from sanic.log import logger
 
 from cb_parser import CentralBankAPI
 
 app = Sanic('app')
 currency_api_client: CentralBankAPI = None
 
+database_connection = sqlite3.connect('currencies.db')
+cursor = database_connection.cursor()
+
+
+async def update_data_in_database():
+    while True:
+        await asyncio.sleep(60)
+        logger.info(f'Updating/inserting info to database')
+    
+        currencies = await currency_api_client.get_information_about_all_currencies()
+        for currency in currencies:
+            print(currency)
+            if not cursor.execute("SELECT * from currencies WHERE char_code = (?)", (currency.char_code,)).fetchone():
+                cursor.execute("INSERT INTO currencies VALUES (?, ?, ?)", (currency.char_code, currency.name, currency.value))
+            else:
+                cursor.execute("UPDATE currencies SET exchange_rate_to_RUB = ? WHERE char_code = ?",
+                               (currency.value, currency.char_code))
+        database_connection.commit()
+
+
+
 
 @app.listener('before_server_start')
-async def init(app, loop):
+async def server_init(app, loop):
     global currency_api_client
     app.aiohttp_session = aiohttp.ClientSession(loop=loop)
     currency_api_client = CentralBankAPI(app.aiohttp_session)
 
+    cursor.execute("""CREATE TABLE IF NOT EXISTS currencies (
+                    char_code TEXT NOT NULL PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    exchange_rate_to_RUB INTEGER NOT NULL)
+     """)
+
+    database_connection.commit()
+
+    app.add_task(update_data_in_database())
+
 
 @app.listener('after_server_stop')
-async def finish(app, loop):
+async def server_stop(app, loop):
     loop.run_until_complete(app.aiohttp_session.close())
     loop.close()
 

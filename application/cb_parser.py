@@ -2,7 +2,7 @@ import aiohttp
 import asyncio
 from aiohttp import ClientSession
 
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 from dataclasses import dataclass
 
 
@@ -87,7 +87,7 @@ class CentralBankAPI:
 
         return None
 
-    async def convert_currencies(self, from_currency: str, to_currency: str)  -> float:
+    async def convert_currencies(self, from_currency: str, to_currency: str) -> float:
         """
         Finds proportion between two currrencies using it's ratio to RUB
         :param from_currency: Currency to convert from
@@ -104,3 +104,28 @@ class CentralBankAPI:
         proportion = from_rubble_ratio / to_rubble_ration
 
         return proportion
+
+    async def get_information_about_all_currencies(self):
+        import xml.etree.ElementTree as ET
+
+        all_currencies_info = await self.__get_all_currencies_rates()
+
+        currencies: List[Currency] = list()
+        # Check if API request was successful
+        if all_currencies_info['http_code'] != 200:
+            # Todo replace or remove base exception raising
+            raise Exception
+
+        document_root = ET.fromstring(all_currencies_info['content'])
+        # Iterate through root children
+        for currency in document_root:
+            currencies.append(Currency(num_code=int(currency.find('NumCode').text),
+                                       char_code=currency.find('CharCode').text,
+                                       nominal=int(currency.find('Nominal').text),
+                                       name=currency.find('Name').text,
+                                       # Replacing comma with dot so it could be converted to the float
+                                       value=float(currency.find('Value').text.replace(',', '.', 1)),
+                                       )
+                              )
+
+        return currencies
