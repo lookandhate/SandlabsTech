@@ -27,7 +27,7 @@ async def homepage(request):
     return json({"hello": "world"})
 
 
-@app.route('/api/course/<currency>', methods=['GET'])
+@app.get('/api/course/<currency>')
 async def currency_course(request, currency):
     data = await currency_api_client.get_currency_info(currency)
     if data is not None:
@@ -39,6 +39,21 @@ async def currency_course(request, currency):
     return json({'message': 'No currency with that name was found. Check spelling and try again'})
 
 
+@app.post('/api/convert')
+async def convert_currencies(request):
+    request_body = request.json
+    # Check if we been provided with all data we need
+    if not all(map(lambda x: x in request_body.keys(), ['from_currency', 'to_currency', 'amount'])):
+        return json({'message': 'Some of required parameters are missing'})
+
+    proportion = await currency_api_client.convert_currencies(request_body['from_currency'],
+                                                              request_body['to_currency']
+                                                              )
+
+    return json({
+                 'currency': request_body['to_currency'],
+                 'amount': round(proportion * int(request_body['amount']), 2)
+                 })
 
 
 app.run(host="0.0.0.0", port=8000)
